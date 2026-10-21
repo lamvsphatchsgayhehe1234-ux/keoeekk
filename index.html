@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Telegram Ocean Store</title>
+  
+  <!-- Telegram WebApp SDK & Tailwind -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <style>
+    /* HIỆU ỨNG NỀN BIỂN ĐẠI DƯƠNG (OCEAN WAVE) SIÊU XỊN */
+    body {
+      background: linear-gradient(135deg, #02233f 0%, #0369a1 50%, #0f172a 100%);
+      background-size: 400% 400%;
+      animation: oceanFlow 15s ease infinite;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    @keyframes oceanFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Hiệu ứng kính mờ (Glassmorphism) trên nền biển */
+    .glass-ocean {
+      background: rgba(2, 43, 76, 0.45);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+    .glass-card {
+      background: rgba(3, 105, 161, 0.25);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between select-none">
+
+  <!-- MÀN HÌNH LOAD ĐẠI DƯƠNG (0% -> 100%) -->
+  <div id="loading-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#021526] transition-opacity duration-500">
+    <div class="relative w-20 h-20 mb-4 flex items-center justify-center">
+      <div class="absolute inset-0 rounded-full border-4 border-sky-500/20"></div>
+      <div class="absolute inset-0 rounded-full border-4 border-sky-400 border-t-transparent animate-spin"></div>
+      <i class="fa-solid fa-water text-2xl text-sky-300 animate-pulse"></i>
+    </div>
+    <div class="text-lg font-bold text-sky-300 tracking-wider" id="loading-text">0%</div>
+    <p class="text-[11px] text-sky-400/70 mt-1">Đang lặn sâu vào hệ thống...</p>
+  </div>
+
+  <!-- MÀN HÌNH BỊ BAN -->
+  <div id="banned-screen" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center hidden">
+    <i class="fa-solid fa-user-slash text-red-500 text-6xl mb-4"></i>
+    <h2 class="text-xl font-bold text-red-400">TÀI KHOẢN ĐÃ BỊ CẤM</h2>
+    <p class="text-xs text-slate-400 mt-2">Bạn đã bị Admin tước quyền truy cập ứng dụng này.</p>
+  </div>
+
+  <!-- APP CONTAINER -->
+  <div id="app" class="hidden flex-col min-h-screen pb-16">
+    
+    <!-- HEADER & HỒ SƠ -->
+    <header class="p-3.5 flex justify-between items-center glass-ocean sticky top-0 z-30 rounded-b-2xl shadow-lg">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-compass text-sky-400 text-lg"></i>
+        <span class="font-extrabold text-sm tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-sky-300 to-cyan-200">OCEAN STORE</span>
+      </div>
+
+      <div class="flex items-center gap-2 bg-[#02233f]/80 p-1 pr-3 rounded-full border border-sky-500/30 shadow-inner">
+        <img id="user-avatar" src="https://via.placeholder.com/35" class="w-7 h-7 rounded-full border border-sky-400 object-cover" />
+        <div class="flex flex-col text-left">
+          <span id="user-name" class="text-[11px] font-semibold max-w-[80px] truncate text-sky-100">User</span>
+          <span id="user-balance" class="text-[10px] text-emerald-400 font-bold">0đ</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <main class="p-3.5 flex-1 space-y-4">
+      
+      <!-- NÚT ADMIN -->
+      <div id="admin-badge" class="hidden">
+        <button onclick="switchTab('admin')" class="w-full py-2.5 px-4 bg-gradient-to-r from-sky-600 via-cyan-600 to-blue-700 rounded-xl font-bold text-xs shadow-lg shadow-sky-500/30 flex items-center justify-center gap-2 text-white">
+          <i class="fa-solid fa-user-shield"></i> PANEL QUẢN TRỊ ADMIN
+        </button>
+      </div>
+
+      <!-- TAB 1: SHOP -->
+      <section id="tab-shop" class="space-y-3">
+        <div class="flex justify-between items-center">
+          <h2 class="font-bold text-xs text-sky-200 flex items-center gap-1.5 uppercase tracking-wide">
+            <i class="fa-solid fa-boxes-stacked text-sky-400"></i> Sản phẩm đại dương
+          </h2>
+          <button onclick="openDepositModal()" class="text-[11px] bg-sky-500/20 text-sky-200 border border-sky-400/40 px-3 py-1 rounded-lg font-medium hover:bg-sky-500/30 transition">
+            <i class="fa-solid fa-wallet"></i> Nạp tiền
+          </button>
+        </div>
+
+        <div id="product-grid" class="grid grid-cols-2 gap-3"></div>
+      </section>
+
+      <!-- TAB 2: ADMIN PANEL -->
+      <section id="tab-admin" class="hidden space-y-4">
+        <div class="flex justify-between items-center">
+          <h2 class="font-bold text-sm text-sky-300">Quản Trị Hệ Thống</h2>
+          <button onclick="switchTab('shop')" class="text-xs bg-[#02233f] border border-sky-500/30 px-3 py-1.5 rounded-lg text-sky-200">Trở lại Shop</button>
+        </div>
+
+        <!-- BACKUP DỮ LIỆU -->
+        <div class="glass-card p-3.5 rounded-2xl space-y-2">
+          <h3 class="font-semibold text-xs text-sky-300"><i class="fa-solid fa-database"></i> Sao Lưu Dữ Liệu</h3>
+          <button onclick="backupDatabase()" class="w-full bg-sky-600 text-xs py-2 rounded-xl font-bold text-white shadow">Tải File Backup (.JSON)</button>
+        </div>
+
+        <!-- CÀI ĐẶT QR -->
+        <div class="glass-card p-3.5 rounded-2xl space-y-2">
+          <h3 class="font-semibold text-xs text-sky-300"><i class="fa-solid fa-qrcode"></i> Cập Nhật Link QR Nạp Tiền</h3>
+          <input type="text" id="admin-qr-url" placeholder="Dán link ảnh QR..." class="w-full bg-[#021526] border border-sky-500/30 p-2 text-xs rounded-xl text-sky-100 focus:outline-none focus:border-sky-400" />
+          <button onclick="saveQRCode()" class="w-full bg-sky-600 text-xs py-2 rounded-xl font-bold text-white">Lưu QR Code</button>
+        </div>
+
+        <!-- THÊM SẢN PHẨM -->
+        <div class="glass-card p-3.5 rounded-2xl space-y-2">
+          <h3 class="font-semibold text-xs text-sky-300"><i class="fa-solid fa-plus-circle"></i> Thêm Sản Phẩm (Ảnh Vuông)</h3>
+          <input type="text" id="p-title" placeholder="Tên sản phẩm" class="w-full bg-[#021526] border border-sky-500/30 p-2 text-xs rounded-xl text-sky-100" />
+          <input type="number" id="p-price" placeholder="Giá tiền (VNĐ)" class="w-full bg-[#021526] border border-sky-500/30 p-2 text-xs rounded-xl text-sky-100" />
+          <input type="text" id="p-image" placeholder="URL link ảnh sản phẩm" class="w-full bg-[#021526] border border-sky-500/30 p-2 text-xs rounded-xl text-sky-100" />
+          <textarea id="p-desc" placeholder="Mô tả sản phẩm" class="w-full bg-[#021526] border border-sky-500/30 p-2 text-xs rounded-xl h-14 text-sky-100"></textarea>
+          <button onclick="addNewProduct()" class="w-full bg-emerald-600 text-xs py-2 rounded-xl font-bold text-white">Thêm Sản Phẩm</button>
+        </div>
+
+        <!-- THÊM KEY -->
+        <div class="glass-card p-3.5 rounded-2xl space-y-2">
+          <h3 class="font-semibold text-xs text-sky-300"><i class="fa-solid fa-key"></i> Thêm Key Cho Sản Phẩm</h3>
+          <select id="key-product-select" class="w-full bg-[#021526] border border-sky-500/30 p-2 text-xs rounded-xl text-sky-200">
+            <option value="">-- Chọn sản phẩm --</option>
+          </select>
+          <textarea id="key-list" placeholder="Danh sách Key (mỗi dòng 1 key)" class="w-full bg-[#021526] border border-sky-500/30 p-2 text-xs rounded-xl h-16 text-sky-100"></textarea>
+          <button onclick="addKeysToProduct()" class="w-full bg-amber-600 text-xs py-2 rounded-xl font-bold text-white">Thêm Key Vào Kho</button>
+        </div>
+
+        <!-- DUYỆT TIỀN -->
+        <div class="glass-card p-3.5 rounded-2xl space-y-2">
+          <h3 class="font-semibold text-xs text-sky-300"><i class="fa-solid fa-check-double"></i> Duyệt Yêu Cầu Nạp Tiền</h3>
+          <div id="pending-deposits-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <!-- BAN USER -->
+        <div class="glass-card p-3.5 rounded-2xl space-y-2">
+          <h3 class="font-semibold text-xs text-red-400"><i class="fa-solid fa-user-slash"></i> Ban / Unban Khách Hàng</h3>
+          <input type="number" id="ban-user-id" placeholder="Nhập Telegram ID" class="w-full bg-[#021526] border border-sky-500/30 p-2 text-xs rounded-xl text-sky-100" />
+          <div class="flex gap-2">
+            <button onclick="setBanUser(true)" class="flex-1 bg-red-600 text-xs py-2 rounded-xl font-bold text-white">Ban User</button>
+            <button onclick="setBanUser(false)" class="flex-1 bg-slate-700 text-xs py-2 rounded-xl font-bold text-white">Gỡ Ban</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL NẠP TIỀN -->
+  <div id="deposit-modal" class="fixed inset-0 bg-black/80 z-40 hidden flex items-center justify-center p-4">
+    <div class="glass-ocean w-full max-w-xs p-4 rounded-2xl space-y-3 relative border border-sky-400/30">
+      <button onclick="closeDepositModal()" class="absolute top-3 right-3 text-sky-300"><i class="fa-solid fa-xmark"></i></button>
+      <h3 class="text-xs font-bold text-center text-sky-200">Nạp Tiền Vào Tài Khoản</h3>
+      <div class="flex justify-center">
+        <img id="modal-qr-img" src="https://via.placeholder.com/180?text=Chua+co+QR" class="w-40 h-40 rounded-xl object-cover border border-sky-400/40" />
+      </div>
+      <p class="text-[10px] text-sky-300 text-center">Nội dung CK: <b id="deposit-memo" class="text-amber-400">NAP [ID]</b></p>
+      <input type="number" id="deposit-amount" placeholder="Số tiền đã chuyển (VNĐ)" class="w-full bg-[#021526] border border-sky-500/30 p-2 text-xs rounded-xl text-sky-100" />
+      <button onclick="submitDepositRequest()" class="w-full bg-sky-600 py-2 rounded-xl font-bold text-xs text-white">Xác Nhận Đã Chuyển Tiền</button>
+    </div>
+  </div>
+
+  <!-- FIREBASE SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+  <script>
+    // ==========================================
+    // ⚙️ THAY THÔNG TIN CẤU HÌNH CỦA BẠN Ở ĐÂY
+    // ==========================================
+    const ADMIN_IDS = [7403694945]; // 🟢 Thay ID Telegram của bạn vào đây
+
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Khởi tạo Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const currentUser = {
+      id: tg.initDataUnsafe?.user?.id || 999888777,
+      first_name: tg.initDataUnsafe?.user?.first_name || "Thành Viên",
+      photo_url: tg.initDataUnsafe?.user?.photo_url || "https://via.placeholder.com/35"
+    };
+
+    let userBalance = 0;
+
+    window.onload = () => {
+      runFastLoader();
+      checkBanStatusAndInit();
+    };
+
+    function runFastLoader() {
+      let p = 0;
+      const t = document.getElementById("loading-text");
+      const s = document.getElementById("loading-screen");
+      const a = document.getElementById("app");
+
+      const timer = setInterval(() => {
+        p += 34;
+        if (p >= 100) p = 100;
+        t.innerText = `${p}%`;
+        if (p === 100) {
+          clearInterval(timer);
+          setTimeout(() => {
+            s.style.opacity = '0';
+            setTimeout(() => {
+              s.classList.add("hidden");
+              a.classList.remove("hidden");
+              a.classList.add("flex");
+            }, 200);
+          }, 150);
+        }
+      }, 40);
+    }
+
+    function checkBanStatusAndInit() {
+      db.collection("bans").doc(String(currentUser.id)).get().then((doc) => {
+        if (doc.exists && doc.data().banned) {
+          document.getElementById("loading-screen").classList.add("hidden");
+          document.getElementById("banned-screen").classList.remove("hidden");
+          return;
+        }
+        setupUser();
+        listenRealtimeData();
+      });
+    }
+
+    function setupUser() {
+      document.getElementById("user-avatar").src = currentUser.photo_url;
+      document.getElementById("user-name").innerText = currentUser.first_name;
+
+      if (ADMIN_IDS.includes(currentUser.id)) {
+        document.getElementById("admin-badge").classList.remove("hidden");
+      }
+
+      db.collection("users").doc(String(currentUser.id)).onSnapshot((doc) => {
+        if (doc.exists) {
+          userBalance = doc.data().balance || 0;
+        } else {
+          db.collection("users").doc(String(currentUser.id)).set({ name: currentUser.first_name, balance: 0 });
+          userBalance = 0;
+        }
+        document.getElementById("user-balance").innerText = `${userBalance.toLocaleString()}đ`;
+      });
+    }
+
+    function listenRealtimeData() {
+      db.collection("settings").doc("payment").onSnapshot((doc) => {
+        if (doc.exists && doc.data().qrUrl) {
+          const qr = doc.data().qrUrl;
+          document.getElementById("modal-qr-img").src = qr;
+          document.getElementById("admin-qr-url").value = qr;
+        }
+      });
+
+      db.collection("products").onSnapshot((snapshot) => {
+        const grid = document.getElementById("product-grid");
+        const select = document.getElementById("key-product-select");
+        grid.innerHTML = "";
+        select.innerHTML = '<option value="">-- Chọn sản phẩm --</option>';
+
+        if (snapshot.empty) {
+          grid.innerHTML = `<p class="col-span-2 text-center text-xs text-sky-300/60 py-6">Chưa có sản phẩm nào</p>`;
+          return;
+        }
+
+        snapshot.forEach((doc) => {
+          const p = doc.data();
+          const pId = doc.id;
+          const count = p.keys ? p.keys.length : 0;
+
+          grid.innerHTML += `
+            <div class="glass-card rounded-2xl p-2 flex flex-col justify-between shadow-lg">
+              <div class="w-full aspect-square rounded-xl overflow-hidden bg-[#011627] mb-2 relative border border-sky-400/20">
+                <img src="${p.image}" class="w-full h-full object-cover" />
+                <span class="absolute top-1 right-1 bg-black/60 backdrop-blur-sm text-[9px] text-sky-200 px-2 py-0.5 rounded-full font-bold">Kho: ${count}</span>
+              </div>
+              <div>
+                <h3 class="font-bold text-xs line-clamp-1 text-sky-100">${p.title}</h3>
+                <p class="text-[10px] text-sky-300/70 line-clamp-1 mb-1">${p.desc || ''}</p>
+                <div class="text-xs font-black text-amber-400 mb-2">${Number(p.price).toLocaleString()}đ</div>
+              </div>
+              <button onclick="buyProduct('${pId}', ${p.price})" class="w-full bg-sky-600 hover:bg-sky-500 text-[11px] py-1.5 rounded-lg font-bold text-white shadow">Mua Ngay</button>
+            </div>
+          `;
+          select.innerHTML += `<option value="${pId}">${p.title} (Còn ${count} key)</option>`;
+        });
+      });
+
+      if (ADMIN_IDS.includes(currentUser.id)) {
+        db.collection("deposits").where("status", "==", "pending").onSnapshot((snapshot) => {
+          const list = document.getElementById("pending-deposits-list");
+          list.innerHTML = "";
+          if (snapshot.empty) {
+            list.innerHTML = `<p class="text-[11px] text-sky-300/60">Không có yêu cầu nạp mới</p>`;
+            return;
+          }
+          snapshot.forEach((doc) => {
+            const d = doc.data();
+            list.innerHTML += `
+              <div class="bg-[#021526] p-2.5 rounded-xl border border-sky-500/20 flex justify-between items-center text-xs">
+                <div>
+                  <p class="font-bold text-sky-300">ID: ${d.userId}</p>
+                  <p class="text-[10px] text-sky-400/70">Số tiền: <b class="text-emerald-400">${Number(d.amount).toLocaleString()}đ</b></p>
+                </div>
+                <button onclick="approveDeposit('${doc.id}', '${d.userId}', ${d.amount})" class="bg-emerald-600 text-[10px] px-3 py-1.5 rounded-lg font-bold text-white">Duyệt</button>
+              </div>
+            `;
+          });
+        });
+      }
+    }
+
+    async function backupDatabase() {
+      try {
+        const productsSnap = await db.collection("products").get();
+        const settingsDoc = await db.collection("settings").doc("payment").get();
+        
+        const backupData = {
+          settings: settingsDoc.exists ? settingsDoc.data() : {},
+          products: productsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+          exportedAt: new Date().toISOString()
+        };
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `ocean_store_backup_${Date.now()}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        alert("Xuất file dữ liệu dự phòng thành công!");
+      } catch (err) {
+        alert("Lỗi xuất file: " + err.message);
+      }
+    }
+
+    function saveQRCode() {
+      const qrUrl = document.getElementById("admin-qr-url").value;
+      if (!qrUrl) return alert("Nhập link QR!");
+      db.collection("settings").doc("payment").set({ qrUrl }).then(() => alert("Cập nhật QR thành công!"));
+    }
+
+    function addNewProduct() {
+      const title = document.getElementById("p-title").value;
+      const price = Number(document.getElementById("p-price").value);
+      const image = document.getElementById("p-image").value;
+      const desc = document.getElementById("p-desc").value;
+
+      if (!title || !price || !image) return alert("Nhập đủ thông tin!");
+
+      db.collection("products").add({
+        title, price, image, desc, keys: [], createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => {
+        alert("Thêm sản phẩm thành công!");
+        document.getElementById("p-title").value = "";
+        document.getElementById("p-price").value = "";
+        document.getElementById("p-image").value = "";
+        document.getElementById("p-desc").value = "";
+      });
+    }
+
+    function addKeysToProduct() {
+      const pId = document.getElementById("key-product-select").value;
+      const raw = document.getElementById("key-list").value;
+      if (!pId || !raw) return alert("Chọn sản phẩm và nhập key!");
+
+      const newKeys = raw.split("\n").map(k => k.trim()).filter(k => k);
+      db.collection("products").doc(pId).update({
+        keys: firebase.firestore.FieldValue.arrayUnion(...newKeys)
+      }).then(() => {
+        alert(`Đã thêm ${newKeys.length} key!`);
+        document.getElementById("key-list").value = "";
+      });
+    }
+
+    function approveDeposit(depositId, targetUserId, amount) {
+      const uRef = db.collection("users").doc(String(targetUserId));
+      db.runTransaction(async (transaction) => {
+        const uDoc = await transaction.get(uRef);
+        const curBal = uDoc.exists ? (uDoc.data().balance || 0) : 0;
+        transaction.set(uRef, { balance: curBal + amount }, { merge: true });
+        transaction.update(db.collection("deposits").doc(depositId), { status: "approved" });
+      }).then(() => alert("Đã duyệt tiền cho ID " + targetUserId));
+    }
+
+    function setBanUser(status) {
+      const targetId = document.getElementById("ban-user-id").value;
+      if (!targetId) return alert("Nhập Telegram ID!");
+      db.collection("bans").doc(targetId).set({ banned: status }).then(() => {
+        alert(status ? `Đã BAN user ID: ${targetId}` : `Đã GỠ BAN user ID: ${targetId}`);
+        document.getElementById("ban-user-id").value = "";
+      });
+    }
+
+    function openDepositModal() {
+      document.getElementById("deposit-memo").innerText = `NAP ${currentUser.id}`;
+      document.getElementById("deposit-modal").classList.remove("hidden");
+    }
+
+    function closeDepositModal() {
+      document.getElementById("deposit-modal").classList.add("hidden");
+    }
+
+    function submitDepositRequest() {
+      const amount = Number(document.getElementById("deposit-amount").value);
+      if (!amount || amount < 1000) return alert("Nhập số tiền hợp lệ!");
+
+      db.collection("deposits").add({
+        userId: currentUser.id,
+        userName: currentUser.first_name,
+        amount,
+        status: "pending",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => {
+        alert("Đã gửi yêu cầu nạp tiền! Chờ Admin duyệt.");
+        closeDepositModal();
+        document.getElementById("deposit-amount").value = "";
+      });
+    }
+
+    function buyProduct(pId, price) {
+      if (userBalance < price) {
+        alert("Số dư không đủ! Vui lòng nạp thêm tiền.");
+        openDepositModal();
+        return;
+      }
+
+      const pRef = db.collection("products").doc(pId);
+      const uRef = db.collection("users").doc(String(currentUser.id));
+
+      db.runTransaction(async (t) => {
+        const pDoc = await t.get(pRef);
+        const uDoc = await t.get(uRef);
+
+        const keys = pDoc.data().keys || [];
+        if (keys.length === 0) throw "Sản phẩm đã HẾT HÀNG!";
+
+        const key = keys.shift();
+        const bal = uDoc.data().balance || 0;
+
+        t.update(pRef, { keys });
+        t.update(uRef, { balance: bal - price });
+        return key;
+      }).then((key) => {
+        tg.showPopup({
+          title: "MUA HÀNG THÀNH CÔNG!",
+          message: `Key của bạn là:\n\n${key}`,
+          buttons: [{ type: "ok" }]
+        });
+      }).catch(err => alert("Lỗi: " + err));
+    }
+
+    function switchTab(tab) {
+      if (tab === 'admin') {
+        document.getElementById("tab-shop").classList.add("hidden");
+        document.getElementById("tab-admin").classList.remove("hidden");
+      } else {
+        document.getElementById("tab-admin").classList.add("hidden");
+        document.getElementById("tab-shop").classList.remove("hidden");
+      }
+    }
+  </script>
+</body>
+</html>
